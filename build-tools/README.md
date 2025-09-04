@@ -9,19 +9,19 @@ This directory contains the build system implementation for the Instrument Panel
 
 ## Usage
 
-From the project root directory, run:
+From the *project root directory*, run:
 
 ```bash
 # Make the build script executable
-chmod +x build.sh
+chmod +x build-tools/build.sh
 
 # Build for all architectures
-./build.sh
+./build-tools/build.sh
 
 # Or build for a specific architecture
-./build.sh x86_64  # For x86_64
-./build.sh arm64   # For ARM64
-./build.sh armhf   # For ARM32
+./build-tools/build.sh x86_64  # For x86_64
+./build-tools/build.sh arm64   # For ARM64
+./build-tools/build.sh armhf   # For ARM32
 ```
 
 ## Build Outputs

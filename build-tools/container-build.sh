@@ -80,7 +80,7 @@ build_for_arch() {
         -L$LIB_PATH \
         $(if [ "$arch" = "win64" ]; then echo "$ALLEGRO_LIBS"; else echo "-lgpiod -lpthread -lallegro -lallegro_image -lallegro_font -lallegro_ttf"; fi)"
 
-    $CXX $CXXFLAGS -v -o instrument-panel-$arch \
+    $CXX $CXXFLAGS -o instrument-panel-$arch \
         -I /build/src -I /build/src/instruments -I $INCLUDE_PATH \
         $CORE_SOURCES \
         $INSTRUMENT_SOURCES \

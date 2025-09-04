@@ -1,0 +1,60 @@
+# Use Ubuntu 22.04 as base image
+FROM ubuntu:22.04
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Enable ARM architectures and add ports repository
+RUN dpkg --add-architecture arm64 && \
+    dpkg --add-architecture armhf && \
+    sed -i 's/deb http/deb [arch=amd64] http/g' /etc/apt/sources.list && \
+    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse' >> /etc/apt/sources.list
+
+# Install build dependencies for all architectures
+RUN apt-get update && apt-get install -y \
+    # Base build tools
+    build-essential \
+    cmake \
+    # Native compiler
+    g++ \
+    # ARM64 cross-compiler
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    # ARM32 cross-compiler
+    gcc-arm-linux-gnueabihf \
+    g++-arm-linux-gnueabihf \
+    # Native libraries
+    libgpiod-dev \
+    liballegro5-dev \
+    liballegro-image5-dev \
+    liballegro-ttf5-dev \
+    # ARM64 libraries
+    libgpiod-dev:arm64 \
+    liballegro5-dev:arm64 \
+    liballegro-image5-dev:arm64 \
+    liballegro-ttf5-dev:arm64 \
+    # ARM32 libraries
+    libgpiod-dev:armhf \
+    liballegro5-dev:armhf \
+    liballegro-image5-dev:armhf \
+    liballegro-ttf5-dev:armhf \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up working directory
+WORKDIR /build
+
+# Set default architecture (can be overridden at runtime)
+ARG ARCH=x86_64
+ENV TARGET_ARCH=$ARCH
+
+# Copy build script
+COPY container-build.sh /build/
+RUN chmod +x /build/container-build.sh
+
+# Set entrypoint
+CMD ["/build/container-build.sh"]
