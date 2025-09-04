@@ -51,7 +51,8 @@
 #include <stdlib.h>
 #ifdef _WIN32
 // Windows only
-#include <Windows.h>
+#include <winsock2.h>
+#include <windows.h>
 #else
  // Raspberry Pi only
 #include "knobs.h"

@@ -3,7 +3,7 @@
 #include <string.h>
 #include <allegro5/allegro.h>
 #ifdef _WIN32
-#include <WS2tcpip.h>
+#include <ws2tcpip.h>
 #endif
 #include "simvars.h"
 

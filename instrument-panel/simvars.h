@@ -3,7 +3,9 @@
 
 #include <thread>
 #ifdef _WIN32
-#include <Windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -16,6 +18,7 @@ typedef int SOCKET;
 #endif
 #include "globals.h"
 #include "simvarDefs.h"
+#include <thread>
 
 extern globalVars globals;
 

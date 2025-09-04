@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef _WIN32
-#include <Windows.h>
+#include <winsock2.h>
+#include <windows.h>
 #endif
 #include "annunciator.h"
 #include "simvars.h"
@@ -308,7 +309,7 @@ void annunciator::update()
         // Alternate on/off every 500 ms
         long timeDiff;
 #ifdef _WIN32
-        long now = GetTickCount64();
+        long now = GetTickCount();
         timeDiff = now - lastFlash;
 #else
         timespec now;
@@ -348,7 +349,7 @@ void annunciator::checkFuel(double fuelLevel, bool *fuelWarning, double *prevFue
             // Flash for 10 seconds
             if (flashCount == 0) {
 #ifdef _WIN32
-                lastFlash = GetTickCount64();
+                lastFlash = GetTickCount();
 #else
                 clock_gettime(CLOCK_MONOTONIC, &lastFlash);
 #endif
