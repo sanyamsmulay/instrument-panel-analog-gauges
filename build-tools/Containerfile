@@ -1,0 +1,144 @@
+FROM ubuntu:22.04
+
+# Set noninteractive installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Step 1: Configure multi-architecture support
+# Required for: arm64 and armhf cross-compilation
+# Step 1: Configure multi-architecture support and package sources
+# Required for: arm64 and armhf cross-compilation
+RUN dpkg --add-architecture arm64 && \
+    dpkg --add-architecture armhf && \
+    sed -i 's/deb http/deb [arch=amd64] http/g' /etc/apt/sources.list && \
+    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse' >> /etc/apt/sources.list && \
+    apt-get update
+
+# Step 2: Install base development tools
+# Required for: building and compiling code
+RUN apt-get install -y \
+        build-essential \
+        cmake \
+        wget \
+        unzip \
+        g++
+
+# Step 3: Install cross-compilers
+# Required for: arm64, armhf, and Windows builds
+RUN apt-get install -y \
+        gcc-aarch64-linux-gnu \
+        g++-aarch64-linux-gnu \
+        gcc-arm-linux-gnueabihf \
+        g++-arm-linux-gnueabihf \
+        mingw-w64 \
+        g++-mingw-w64-x86-64-posix
+
+# Step 4: Install Linux architecture-specific libraries
+# Required for: GPIO and Allegro support on different architectures
+RUN apt-get install -y \
+        libgpiod-dev \
+        libgpiod-dev:arm64 \
+        libgpiod-dev:armhf \
+        liballegro5-dev \
+        liballegro-image5-dev \
+        liballegro-ttf5-dev \
+        liballegro5-dev:arm64 \
+        liballegro-image5-dev:arm64 \
+        liballegro-ttf5-dev:arm64 \
+        liballegro5-dev:armhf \
+        liballegro-image5-dev:armhf \
+        liballegro-ttf5-dev:armhf
+
+# Step 5: Set up Windows-specific dependencies
+# Required for: Windows Allegro support
+WORKDIR /opt/windows
+RUN mkdir -p allegro && cd allegro \
+    && wget https://github.com/liballeg/allegro5/releases/download/5.2.8.0/allegro-x86_64-w64-mingw32-gcc-12.1.0-posix-seh-static-5.2.8.0.zip \
+    && unzip allegro-x86_64-w64-mingw32-gcc-12.1.0-posix-seh-static-5.2.8.0.zip \
+    && rm allegro-x86_64-w64-mingw32-gcc-12.1.0-posix-seh-static-5.2.8.0.zip
+
+# Step 6: Install MXE build dependencies
+# Required for: Windows cross-compilation environment
+RUN apt-get install -y \
+    autoconf \
+    automake \
+    autopoint \
+    bash \
+    bison \
+    bzip2 \
+    flex \
+    g++-multilib \
+    gettext \
+    git \
+    gperf \
+    intltool \
+    libc6-dev-i386 \
+    libgdk-pixbuf2.0-dev \
+    libltdl-dev \
+    libssl-dev \
+    libtool-bin \
+    libxml-parser-perl \
+    lzip \
+    make \
+    openssl \
+    p7zip-full \
+    patch \
+    perl \
+    python3 \
+    python3-mako \
+    python-is-python3 \
+    ruby \
+    sed \
+    unzip \
+    wget \
+    xz-utils
+
+# Step 7: Clone MXE
+# Required for: Windows cross-compilation toolchain setup
+RUN git clone https://github.com/mxe/mxe.git
+
+# Step 8: Build MXE GCC
+# Required for: Windows cross-compiler
+RUN cd mxe && make MXE_TARGETS='x86_64-w64-mingw32.static' gcc
+
+# Step 9: Build Base Libraries
+# Required for: Core dependencies for Allegro
+RUN cd mxe && make MXE_TARGETS='x86_64-w64-mingw32.static' zlib
+
+# Step 10: Build Image Libraries
+# Required for: Image support in Allegro
+# remove the libwebp from here later
+RUN cd mxe && make MXE_TARGETS='x86_64-w64-mingw32.static' libpng libjpeg-turbo libwebp freetype
+
+# Step 11: Install MXE
+# Required for: Making cross-compiler available system-wide
+RUN cp -r mxe/usr/x86_64-w64-mingw32.static/* /usr/x86_64-w64-mingw32/ \
+    && rm -rf mxe
+
+# Final cleanup
+RUN rm -rf /var/lib/apt/lists/*
+
+# Step 12: Configure build environment
+# Required for: build script execution and architecture selection
+WORKDIR /build
+
+# Build configuration
+ARG ARCH=x86_64
+ENV TARGET_ARCH=$ARCH
+
+# Copy and prepare build script
+# Note: Source files will be mounted at runtime
+COPY container-build.sh /build/
+RUN chmod +x /build/container-build.sh
+
+# Default command
+CMD ["/build/container-build.sh"]
+
+# Build instructions:
+# 1. Build image: podman build -t instrument-panel-builder .
+# 2. Run build:   ./build.sh <arch>
+#    where <arch> is one of: x86_64, arm64, armhf, win64
