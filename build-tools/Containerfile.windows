@@ -1,0 +1,98 @@
+# Use Ubuntu 22.04 as base image
+FROM ubuntu:22.04
+
+# Avoid interactive prompts during package installation
+# Set noninteractive installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Step 1: Install base development tools
+# Required for: building and compiling code
+RUN apt-get update && apt-get install -y \
+        build-essential \
+        cmake \
+        wget \
+        unzip \
+        pkg-config
+
+# Step 2: Install MinGW cross-compiler
+# Required for: Windows cross-compilation
+RUN apt-get install -y \
+        mingw-w64 \
+        mingw-w64-tools \
+        mingw-w64-x86-64-dev \
+        g++-mingw-w64-x86-64-posix
+
+# Step 5: Set up Windows-specific dependencies
+# Required for: Windows Allegro support
+WORKDIR /opt/windows
+RUN mkdir -p allegro && cd allegro \
+    && wget https://github.com/liballeg/allegro5/releases/download/5.2.8.0/allegro-x86_64-w64-mingw32-gcc-12.1.0-posix-seh-static-5.2.8.0.zip \
+    && unzip allegro-x86_64-w64-mingw32-gcc-12.1.0-posix-seh-static-5.2.8.0.zip \
+    && rm allegro-x86_64-w64-mingw32-gcc-12.1.0-posix-seh-static-5.2.8.0.zip
+
+# Step 6: Install MXE build dependencies
+# Required for: Windows cross-compilation environment
+RUN apt-get install -y \
+    autoconf \
+    automake \
+    autopoint \
+    bash \
+    bison \
+    bzip2 \
+    flex \
+    g++-multilib \
+    gettext \
+    git \
+    gperf \
+    intltool \
+    libc6-dev-i386 \
+    libgdk-pixbuf2.0-dev \
+    libltdl-dev \
+    libssl-dev \
+    libtool-bin \
+    libxml-parser-perl \
+    lzip \
+    make \
+    openssl \
+    p7zip-full \
+    patch \
+    perl \
+    python3 \
+    python3-mako \
+    python-is-python3 \
+    ruby \
+    sed \
+    unzip \
+    wget \
+    xz-utils
+
+# Step 7: Clone MXE
+# Required for: Windows cross-compilation toolchain setup
+RUN git clone https://github.com/mxe/mxe.git
+
+# Step 8: Build MXE GCC
+# Required for: Windows cross-compiler
+RUN cd mxe && make MXE_TARGETS='x86_64-w64-mingw32.static' gcc
+
+# Step 9: Build Base Libraries
+# Required for: Core dependencies for Allegro
+RUN cd mxe && make MXE_TARGETS='x86_64-w64-mingw32.static' zlib
+
+# Step 10: Build Image Libraries
+# Required for: Image support in Allegro
+# remove the libwebp from here later
+RUN cd mxe && make MXE_TARGETS='x86_64-w64-mingw32.static' libpng libjpeg-turbo libwebp freetype
+
+# Step 11: Install MXE
+# Required for: Making cross-compiler available system-wide
+RUN cp -r mxe/usr/x86_64-w64-mingw32.static/* /usr/x86_64-w64-mingw32/ \
+    && rm -rf mxe
+
+# Final cleanup
+RUN rm -rf /var/lib/apt/lists/*
+
+# Set up working directory
+WORKDIR /build
+
+# Set entrypoint
+CMD ["/build/container-build.sh"]
