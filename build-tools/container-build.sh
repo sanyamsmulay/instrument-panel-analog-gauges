@@ -23,8 +23,8 @@ build_for_arch() {
             ;;
         "x86_64")
             export CXX=g++
-            export CFLAGS="-march=x86-64"
-            export CXXFLAGS="-march=x86-64"
+            export CFLAGS="-march=x86-64 -DDESKTOP_LINUX"
+            export CXXFLAGS="-march=x86-64 -DDESKTOP_LINUX"
             export LIB_PATH="/usr/lib/x86_64-linux-gnu"
             ;;
         "win64")
@@ -90,12 +90,20 @@ build_for_arch() {
             $INSTRUMENT_SOURCES \
             $ALLEGRO_LIBS
     else
+        # Common libraries for all Linux builds
+        LINUX_LIBS="-lpthread -lallegro -lallegro_image -lallegro_font -lallegro_ttf"
+        
+        # Add gpiod only for ARM builds
+        if [[ "$arch" == "arm"* ]]; then
+            LINUX_LIBS="-lgpiod $LINUX_LIBS"
+        fi
+
         $CXX $CXXFLAGS -o instrument-panel-$arch \
             -I /build/src -I /build/src/instruments \
             $CORE_SOURCES \
             $INSTRUMENT_SOURCES \
             -L$LIB_PATH \
-            -lgpiod -lpthread -lallegro -lallegro_image -lallegro_font -lallegro_ttf
+            $LINUX_LIBS
     fi
 
     echo "Build command exit code: $?"

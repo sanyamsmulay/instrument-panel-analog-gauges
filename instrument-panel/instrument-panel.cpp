@@ -49,12 +49,13 @@
 
 #include <cstdio>
 #include <stdlib.h>
+// Platform-specific includes
 #ifdef _WIN32
 // Windows only
 #include <winsock2.h>
 #include <windows.h>
-#else
- // Raspberry Pi only
+// Include knobs for both Desktop Linux and Raspberry Pi
+// NoKnobs flag will handle the difference in functionality
 #include "knobs.h"
 #endif
 #include <list>
@@ -97,6 +98,11 @@
 
 // If you have an older Raspberry Pi uncomment the next line to use WiringPi instead of gpiod
 //#define NoGpiod
+
+// Desktop Linux builds don't have hardware knobs
+#if defined(DESKTOP_LINUX)
+#define NoKnobs
+#endif
 
 #ifdef NoKnobs
 const bool HaveHardwareKnobs = false;
@@ -234,17 +240,21 @@ void init(const char *settingsFile = NULL)
 
     al_register_event_source(eventQueue, al_get_timer_event_source(timer));
 
-#ifndef _WIN32
     // Only have hardware knobs on Raspberry Pi
+    #if !defined(_WIN32) && !defined(DESKTOP_LINUX) && !defined(NoGpiod)
     if (HaveHardwareKnobs) {
         globals.hardwareKnobs = new knobs();
     }
-#endif
+    #endif
 }
 
 /// <summary>
 /// Cleanup Allegro etc.
 /// </summary>
+#ifndef _WIN32
+#include "knobs.h"
+#endif
+
 void cleanup()
 {
     // Destroy all instruments
@@ -701,11 +711,12 @@ int main(int argc, char **argv)
         delete globals.simVars;
     }
 
-#ifndef _WIN32
+    // Only clean up hardware knobs on Raspberry Pi
+    #if !defined(_WIN32) && !defined(DESKTOP_LINUX) && !defined(NoGpiod)
     if (globals.hardwareKnobs) {
         delete globals.hardwareKnobs;
     }
-#endif
+    #endif
 
     cleanup();
     return 0;

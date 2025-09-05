@@ -1,4 +1,5 @@
 #ifndef _WIN32
+#ifndef DESKTOP_LINUX
 #ifndef NoKnobs
 #ifdef NoGpiod
 #include <wiringPi.h>
@@ -6,11 +7,22 @@
 #include <gpiod.h>
 #endif
 #endif
+#endif
 #include "knobs.h"
 
 void watcher(knobs*);
 
+#ifdef DESKTOP_LINUX
+// building for desktop Linux noKnobs=true
+
+// don't need to do anything for desktop Linux
+static void gpioInit() {}
+static void gpioAdd(int gpioNum) {}
+static void gpioReadAll() {}
+static int gpioGetState(int gpioNum) { return 0; }
+#else
 #ifdef NoGpiod
+// building for Raspberry Pi with WiringPi
 static void gpioInit()
 {
     // Use BCM GPIO pin numbers
@@ -42,7 +54,7 @@ static int gpioGetState(int gpioNum)
 }
 
 #else
-
+// building for Raspberry Pi with gpiod
 const int MaxGpio = 28;
 char chipName[16];
 struct gpiod_chip* gpioChip;
@@ -109,6 +121,7 @@ static int gpioGetState(int gpioNum)
     // States have already been read so just return the requested one
     return gpioValues[gpioNum];
 }
+#endif
 #endif
 
 knobs::knobs()
