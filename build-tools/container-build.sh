@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
+set -x
 
-# Function to build for specific architecture
+# Function to build for specified architecture
 build_for_arch() {
     local arch=$1
     echo "Building for architecture: $arch"
@@ -35,7 +36,7 @@ build_for_arch() {
             export ALLEGRO_LIBS="-lallegro_monolith-static -lwinmm -lgdi32 -lopengl32 -lole32 -ldsound -ldinput8 -ldxguid -lshlwapi -lpsapi -luuid -lpthread -lws2_32 -lmswsock -lpng16 -ljpeg -lwebp -lsharpyuv -lfreetype -lz"
             ;;
         *)
-            echo "Unsupported architecture: $arch"
+            echo "Unsupported Linux architecture: $arch"
             exit 1
             ;;
     esac
@@ -71,21 +72,31 @@ build_for_arch() {
         done
     done
 
-# Build the project
-    echo "Full build command:"
-    echo "$CXX $CXXFLAGS -v -o instrument-panel-$arch \
-        -I /build/src -I /build/src/instruments -I $INCLUDE_PATH \
-        $CORE_SOURCES \
-        $INSTRUMENT_SOURCES \
-        -L$LIB_PATH \
-        $(if [ "$arch" = "win64" ]; then echo "$ALLEGRO_LIBS"; else echo "-lgpiod -lpthread -lallegro -lallegro_image -lallegro_font -lallegro_ttf"; fi)"
+    # # Build the project
+    # echo "Full build command:"
+    # echo "$CXX $CXXFLAGS -v -o instrument-panel-$arch \
+    #     -I /build/src -I /build/src/instruments \
+    #     $CORE_SOURCES \
+    #     $INSTRUMENT_SOURCES \
+    #     -L$LIB_PATH \
+    #     -lgpiod -lpthread -lallegro -lallegro_image -lallegro_font -lallegro_ttf"
+    # should be taken care of by the -x flag at the start
 
-    $CXX $CXXFLAGS -o instrument-panel-$arch \
-        -I /build/src -I /build/src/instruments -I $INCLUDE_PATH \
-        $CORE_SOURCES \
-        $INSTRUMENT_SOURCES \
-        -L$LIB_PATH \
-        $(if [ "$arch" = "win64" ]; then echo "$ALLEGRO_LIBS"; else echo "-lgpiod -lpthread -lallegro -lallegro_image -lallegro_font -lallegro_ttf"; fi)
+    # Set up build flags based on target OS
+    if [ "$arch" = "win64" ]; then
+        $CXX $CXXFLAGS -o instrument-panel-$arch.exe \
+            -I /build/src -I /build/src/instruments -I $INCLUDE_PATH \
+            $CORE_SOURCES \
+            $INSTRUMENT_SOURCES \
+            $ALLEGRO_LIBS
+    else
+        $CXX $CXXFLAGS -o instrument-panel-$arch \
+            -I /build/src -I /build/src/instruments \
+            $CORE_SOURCES \
+            $INSTRUMENT_SOURCES \
+            -L$LIB_PATH \
+            -lgpiod -lpthread -lallegro -lallegro_image -lallegro_font -lallegro_ttf
+    fi
 
     echo "Build command exit code: $?"
 

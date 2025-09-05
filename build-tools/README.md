@@ -15,13 +15,22 @@ From the *project root directory*, run:
 # Make the build script executable
 chmod +x build-tools/build.sh
 
-# Build for all architectures
-./build-tools/build.sh
+# Build for all architectures (Linux and Windows)
+./build-tools/build.sh all
 
-# Or build for a specific architecture
-./build-tools/build.sh x86_64  # For x86_64
-./build-tools/build.sh arm64   # For ARM64
-./build-tools/build.sh armhf   # For ARM32
+# Build for all Linux architectures
+./build-tools/build.sh linux
+# Build for specific Linux architecture
+./build-tools/build.sh linux x86_64  # For x86_64
+./build-tools/build.sh linux arm64   # For ARM64
+./build-tools/build.sh linux armhf   # For ARM32
+
+# Build for Windows
+# Buils for all Windows architectures
+./build-tools/build.sh windows 
+# Build for specific Windows architectures
+./build-tools/build.sh windows win64 # For x86_64
+# TODO: ./build-tools/build.sh windows win32 # For x86_32
 ```
 
 ## Build Outputs
@@ -34,8 +43,10 @@ build/
   │   └── instrument-panel-x86_64
   ├── arm64/
   │   └── instrument-panel-arm64
-  └── armhf/
-      └── instrument-panel-armhf
+  ├── armhf/
+  │   └── instrument-panel-armhf
+  └── windows/
+      └── instrument-panel-win64.exe
 ```
 
 ## Requirements

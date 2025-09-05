@@ -3,8 +3,6 @@ FROM ubuntu:22.04
 # Set noninteractive installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Step 1: Configure multi-architecture support
-# Required for: arm64 and armhf cross-compilation
 # Step 1: Configure multi-architecture support and package sources
 # Required for: arm64 and armhf cross-compilation
 RUN dpkg --add-architecture arm64 && \
