@@ -4,8 +4,14 @@ This directory contains the build system implementation for the Instrument Panel
 
 ## Files
 
-- `Containerfile`: Defines the build environment with all required dependencies
+### Build System
+- `Containerfile.linux`: Defines the Linux build environment with all required dependencies
+- `Containerfile.windows`: Defines the Windows build environment with all required dependencies
 - `container-build.sh`: Internal script that handles the actual build process for different architectures
+
+### Run Scripts
+- `scripts/build-and-run-x86.sh`: Builds and runs the application directly on a Linux x86_64 desktop
+- `scripts/run-in-container.sh`: Runs the pre-built application in a container with X11 forwarding
 
 ## Usage
 
@@ -49,7 +55,34 @@ build/
       └── instrument-panel-win64.exe
 ```
 
+## Running the Application
+
+There are two ways to run the application on a Linux desktop:
+
+1. Direct execution (requires local dependencies):
+```bash
+./build-tools/scripts/build-and-run-x86.sh
+```
+
+2. Container execution (recommended, no local dependencies needed):
+```bash
+./build-tools/scripts/run-in-container.sh
+```
+
+The container execution method provides a consistent runtime environment and includes all necessary dependencies.
+
 ## Requirements
 
+### Build Requirements
 - Podman installed on the host system
 - Internet connection (for first build to download base image and packages)
+
+### Runtime Requirements
+For direct execution:
+- liballegro5.2 and related packages (image, font, ttf)
+- libgpiod (for hardware interface)
+- OpenGL/Mesa drivers
+
+For container execution:
+- Podman
+- X11 server with container access allowed

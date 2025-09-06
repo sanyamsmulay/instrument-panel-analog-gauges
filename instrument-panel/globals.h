@@ -75,6 +75,7 @@ struct globalVars
     const int Ornithopter_Len = 11;
     const int FastAircraftSpeed = 198;
 
+    // TODO: convert to runtime arguments
     const char* BitmapDir = "bitmaps/";
     const char* SettingsDir = "settings/";
     const char* SettingsFile = "settings/instrument-panel.json";

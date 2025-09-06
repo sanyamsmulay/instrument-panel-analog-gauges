@@ -53,6 +53,16 @@ RUN apt-get install -y \
         liballegro-image5-dev:armhf \
         liballegro-ttf5-dev:armhf
 
+# Step 5: Install Linux runtime libraries for Allegro and OpenGL
+# Required for: Allegro support and graphics on Linux
+RUN apt-get install -y \
+        liballegro5.2 \
+        liballegro-image5.2 \
+        liballegro-ttf5.2 \
+        libgl1-mesa-dri \
+        libgl1-mesa-glx \
+        mesa-utils
+
 # Final cleanup
 RUN rm -rf /var/lib/apt/lists/*
 
