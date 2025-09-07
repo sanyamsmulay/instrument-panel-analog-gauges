@@ -25,7 +25,7 @@ xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f ${XAUTH} nmerge -
 podman run --rm -it \
     --device /dev/dri \
     --security-opt label=type:container_runtime_t \
-    -p 52020:52020 \
+    -p 52020:52020/udp \
     -e DISPLAY=$DISPLAY \
     -e XAUTHORITY=${XAUTH} \
     -v ${XSOCK}:${XSOCK} \
@@ -36,4 +36,4 @@ podman run --rm -it \
     -v "$PROJECT_ROOT/instrument-panel/bitmaps:/build/output/x86_64/bitmaps:ro" \
     instrument-panel-linux-builder \
     bash -c "cd /build/output/x86_64 && \
-             ./instrument-panel-x86_64"
+            ./instrument-panel-x86_64 2>&1 | tee /dev/tty"

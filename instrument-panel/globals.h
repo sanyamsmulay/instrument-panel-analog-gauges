@@ -95,8 +95,8 @@ struct globalVars
     char info[256] = { '\0' };
 
     char dataLinkHost[64] = "127.0.0.1";
-    int dataLinkPort = 52020;
-    int dataRateFps = 30;
+    int dataLinkPort = 52021;
+    int dataRateFps = 1;
     int startOnMonitor = 0;
     bool monitorFullscreen = true;
     int monitorWidth = 1200;

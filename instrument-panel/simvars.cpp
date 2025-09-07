@@ -742,34 +742,70 @@ void dataLink(simvars* thisPtr)
     int bytes;
     int selFail = 0;
 
+    printf("DataLink: Starting data link thread...\n");
+
 #ifdef _WIN32
     WSADATA wsaData;
+    printf("DataLink: Initializing Windows Sockets...\n");
     int err = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (err != 0) {
         sprintf(errMsg, "DataLink: Failed to initialise Windows Sockets: %d\n", err);
         fatalError(errMsg);
     }
+    printf("DataLink: Windows Sockets initialized successfully\n");
 #endif
 
     // Create a UDP socket
+    printf("DataLink: Creating UDP socket...\n");
     SOCKET sockfd;
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == INVALID_SOCKET) {
+#ifdef _WIN32
+        printf("DataLink: Socket creation failed with error: %d\n", WSAGetLastError());
+#else
+        printf("DataLink: Socket creation failed with error: %d\n", errno);
+#endif
         fatalError("DataLink: Failed to create UDP socket");
     }
 
+    // Bind to local port 52020 for receiving responses
+    sockaddr_in localAddr;
+    localAddr.sin_family = AF_INET;
+    localAddr.sin_port = htons(52020);
+    localAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(sockfd, (struct sockaddr*)&localAddr, sizeof(localAddr)) == SOCKET_ERROR) {
+#ifdef _WIN32
+        printf("DataLink: Bind failed with error: %d\n", WSAGetLastError());
+#else
+        printf("DataLink: Bind failed with error: %d\n", errno);
+#endif
+        fatalError("DataLink: Failed to bind UDP socket");
+    }
+    printf("DataLink: Bound to port 52020 for receiving\n");
+
     int opt = 1;
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
+#ifdef _WIN32
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) == SOCKET_ERROR) {
+        printf("DataLink: setsockopt failed with error: %d\n", WSAGetLastError());
+    }
+#else
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        printf("DataLink: setsockopt failed with error: %d\n", errno);
+    }
+#endif
 
     sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(globals.dataLinkPort);
-    if (inet_pton(AF_INET, globals.dataLinkHost, &addr.sin_addr) <= 0)
-    {
+    printf("DataLink: Connecting to %s:%d...\n", globals.dataLinkHost, globals.dataLinkPort);
+    
+    if (inet_pton(AF_INET, globals.dataLinkHost, &addr.sin_addr) <= 0) {
         sprintf(errMsg, "DataLink: Invalid server address: %s\n", globals.dataLinkHost);
         fatalError(errMsg);
     }
 
     resetConnection();
+    printf("DataLink: Connection reset, starting main loop\n");
 
     while (!globals.quit) {
         // Poll instrument data link
@@ -782,9 +818,11 @@ void dataLink(simvars* thisPtr)
         //    request.wantFullData = 1;
         //}
         request.wantFullData = 1;
+        printf("DataLink: Sending request\n");
         bytes = sendto(sockfd, (char*)&request, sizeof(request), 0, (SOCKADDR*)&addr, sizeof(addr));
 
         if (bytes > 0) {
+            printf("DataLink: Request sent\n");
             fd_set fds;
             FD_ZERO(&fds);
             FD_SET(sockfd, &fds);
@@ -793,7 +831,7 @@ void dataLink(simvars* thisPtr)
             if (sel > 0) {
                 // Receive latest data (delta will never be larger than full data size)
                 bytes = recv(sockfd, deltaData, dataSize, 0);
-
+                printf("DataLink: Received %d bytes\n", bytes);
                 if (bytes == 4) {
                     // Data size mismatch
                     memcpy(&actualSize, &thisPtr->simVars, 4);
@@ -813,22 +851,27 @@ void dataLink(simvars* thisPtr)
                     processData(thisPtr);
                 }
                 else {
+                    printf("DataLink: Receive failed\n");
                     bytes = SOCKET_ERROR;
                 }
             }
             else {
                 // Link can blip so wait for multiple failures
                 selFail++;
+                printf("DataLink: Select failed %d times\n", selFail);
                 if (selFail > 100) {
+                    printf("DataLink: Multiple select failures detected\n");
                     bytes = SOCKET_ERROR;
                 }
             }
         }
         else {
+            printf("DataLink: Send failed\n");
             bytes = SOCKET_ERROR;
         }
 
         if (bytes == SOCKET_ERROR && globals.dataLinked) {
+            printf("DataLink: Connection lost, resetting...\n");
             resetConnection();
         }
 
@@ -840,9 +883,12 @@ void dataLink(simvars* thisPtr)
 #endif
     }
 
+    printf("DataLink: Cleaning up...\n");
     closesocket(sockfd);
 
 #ifdef _WIN32
     WSACleanup();
 #endif
+    
+    printf("DataLink: Thread terminated\n");
 }
