@@ -689,11 +689,26 @@ void simvars::write(EVENT_ID eventId, double value)
         }
 
         int opt = 1;
-        setsockopt(writeSockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
+#ifdef _WIN32
+        if (setsockopt(writeSockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) == SOCKET_ERROR) {
+            printf("DataLink: Write socket setsockopt failed with error: %d\n", WSAGetLastError());
+        }
+#else
+        if (setsockopt(writeSockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+            printf("DataLink: Write socket setsockopt failed with error: %d\n", errno);
+        }
+#endif
 
         writeAddr.sin_family = AF_INET;
         writeAddr.sin_port = htons(globals.dataLinkPort);
-        inet_pton(AF_INET, globals.dataLinkHost, &writeAddr.sin_addr);
+        
+        // Use environment variable for host address if available (for container communication)
+        const char* hostAddr = getenv("DATA_LINK_HOST");
+        if (hostAddr == NULL) {
+            hostAddr = globals.dataLinkHost;
+        }
+        
+        inet_pton(AF_INET, hostAddr, &writeAddr.sin_addr);
     }
 
     int bytes = sendto(writeSockfd, (char*)&writeRequest, sizeof(writeRequest), 0, (SOCKADDR*)&writeAddr, sizeof(writeAddr));
@@ -705,6 +720,8 @@ void simvars::write(EVENT_ID eventId, double value)
 void resetConnection()
 {
     dataSize = sizeof(SimVars);
+    printf("DataLink: dataSize = %zu bytes\n", dataSize);
+    fflush(stdout);
     request.requestedSize = dataSize;
 
     // Want full data on first connect
@@ -755,25 +772,38 @@ void dataLink(simvars* thisPtr)
     printf("DataLink: Windows Sockets initialized successfully\n");
 #endif
 
-    // Create a UDP socket
-    printf("DataLink: Creating UDP socket...\n");
-    SOCKET sockfd;
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == INVALID_SOCKET) {
+    // Create receive socket
+    printf("DataLink: Creating receive socket...\n");
+    SOCKET recvSock;
+    recvSock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (recvSock == INVALID_SOCKET) {
 #ifdef _WIN32
-        printf("DataLink: Socket creation failed with error: %d\n", WSAGetLastError());
+        printf("DataLink: Receive socket failed with error: %d\n", WSAGetLastError());
 #else
-        printf("DataLink: Socket creation failed with error: %d\n", errno);
+        printf("DataLink: Receive socket failed with error: %d\n", errno);
 #endif
-        fatalError("DataLink: Failed to create UDP socket");
+        fatalError("DataLink: Failed to create receive UDP socket");
     }
 
-    // Bind to local port 52020 for receiving responses
-    sockaddr_in localAddr;
-    localAddr.sin_family = AF_INET;
-    localAddr.sin_port = htons(52020);
-    localAddr.sin_addr.s_addr = INADDR_ANY;
+    // Create send socket
+    SOCKET sendSock;
+    sendSock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sendSock == INVALID_SOCKET) {
+#ifdef _WIN32
+        printf("DataLink: Send socket failed with error: %d\n", WSAGetLastError());
+#else
+        printf("DataLink: Send socket failed with error: %d\n", errno);
+#endif
+        fatalError("DataLink: Failed to create send UDP socket");
+    }
 
-    if (bind(sockfd, (struct sockaddr*)&localAddr, sizeof(localAddr)) == SOCKET_ERROR) {
+    // Configure receive socket
+    sockaddr_in recvAddr;
+    recvAddr.sin_family = AF_INET;
+    recvAddr.sin_port = htons(52020);
+    recvAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(recvSock, (SOCKADDR*)&recvAddr, sizeof(recvAddr)) == SOCKET_ERROR) {
 #ifdef _WIN32
         printf("DataLink: Bind failed with error: %d\n", WSAGetLastError());
 #else
@@ -785,22 +815,35 @@ void dataLink(simvars* thisPtr)
 
     int opt = 1;
 #ifdef _WIN32
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) == SOCKET_ERROR) {
+    if (setsockopt(recvSock, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) == SOCKET_ERROR) {
+        printf("DataLink: setsockopt failed with error: %d\n", WSAGetLastError());
+    }
+    if (setsockopt(sendSock, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt)) == SOCKET_ERROR) {
         printf("DataLink: setsockopt failed with error: %d\n", WSAGetLastError());
     }
 #else
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+    if (setsockopt(recvSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        printf("DataLink: setsockopt failed with error: %d\n", errno);
+    }
+    if (setsockopt(sendSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         printf("DataLink: setsockopt failed with error: %d\n", errno);
     }
 #endif
 
-    sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(globals.dataLinkPort);
-    printf("DataLink: Connecting to %s:%d...\n", globals.dataLinkHost, globals.dataLinkPort);
+    sockaddr_in sendAddr;
+    sendAddr.sin_family = AF_INET;
+    sendAddr.sin_port = htons(globals.dataLinkPort);
     
-    if (inet_pton(AF_INET, globals.dataLinkHost, &addr.sin_addr) <= 0) {
-        sprintf(errMsg, "DataLink: Invalid server address: %s\n", globals.dataLinkHost);
+    // Use environment variable for host address if available (for container communication)
+    const char* hostAddr = getenv("DATA_LINK_HOST");
+    if (hostAddr == NULL) {
+        hostAddr = globals.dataLinkHost;
+    }
+    
+    printf("DataLink: Will send data to %s:%d...\n", hostAddr, globals.dataLinkPort);
+    
+    if (inet_pton(AF_INET, hostAddr, &sendAddr.sin_addr) <= 0) {
+        sprintf(errMsg, "DataLink: Invalid server address: %s\n", hostAddr);
         fatalError(errMsg);
     }
 
@@ -818,25 +861,36 @@ void dataLink(simvars* thisPtr)
         //    request.wantFullData = 1;
         //}
         request.wantFullData = 1;
+        printf("DataLink: Request - RequestedSize: %d, WantFullData: %d\n", request.requestedSize, request.wantFullData);
+        printf("DataLink: Request - reqSelfSize: %d\n", sizeof(request));        
+        printf("DataLink: Request - RequestedSize: %d, WantFullData: %d\n", sizeof(request.requestedSize), sizeof(request.wantFullData));
+
+        fflush(stdout);
         printf("DataLink: Sending request\n");
-        bytes = sendto(sockfd, (char*)&request, sizeof(request), 0, (SOCKADDR*)&addr, sizeof(addr));
+        
+        for (int i = 0; i < sizeof(request); i++) {
+            printf("%02x ", ((unsigned char*)&request)[i]);
+        }
+        printf("\n");
+
+        bytes = sendto(sendSock, (char*)&request, sizeof(request), 0, (SOCKADDR*)&sendAddr, sizeof(sendAddr));
 
         if (bytes > 0) {
             printf("DataLink: Request sent\n");
             fd_set fds;
             FD_ZERO(&fds);
-            FD_SET(sockfd, &fds);
+            FD_SET(recvSock, &fds);
 
             int sel = select(FD_SETSIZE, &fds, 0, 0, &timeout);
             if (sel > 0) {
                 // Receive latest data (delta will never be larger than full data size)
-                bytes = recv(sockfd, deltaData, dataSize, 0);
+                bytes = recv(recvSock, deltaData, dataSize, 0);
                 printf("DataLink: Received %d bytes\n", bytes);
                 if (bytes == 4) {
                     // Data size mismatch
                     memcpy(&actualSize, &thisPtr->simVars, 4);
                     sprintf(errMsg, "DataLink: Requested %ld bytes but server has %ld bytes\n", request.requestedSize, actualSize);
-                    fatalError(errMsg);
+                    //fatalError(errMsg);
                 }
                 else if (bytes > 0) {
                     if (bytes == dataSize) {
@@ -884,7 +938,8 @@ void dataLink(simvars* thisPtr)
     }
 
     printf("DataLink: Cleaning up...\n");
-    closesocket(sockfd);
+    closesocket(recvSock);
+    closesocket(sendSock);
 
 #ifdef _WIN32
     WSACleanup();

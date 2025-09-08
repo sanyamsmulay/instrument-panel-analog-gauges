@@ -20,12 +20,17 @@ XAUTH=/tmp/.docker.xauth
 touch ${XAUTH}
 xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f ${XAUTH} nmerge -
 
+# Get host IP for container communication
+HOST_IP=$(ip route get 1.1.1.1 | awk '{print $7}' | head -1)
+echo "Host IP for container communication: $HOST_IP"
+
 # Run the application in container with X11 forwarding
 # TODO: make port a runtime argument
 podman run --rm -it \
     --device /dev/dri \
     --security-opt label=type:container_runtime_t \
     -p 52020:52020/udp \
+    -e DATA_LINK_HOST=$HOST_IP \
     -e DISPLAY=$DISPLAY \
     -e XAUTHORITY=${XAUTH} \
     -v ${XSOCK}:${XSOCK} \
