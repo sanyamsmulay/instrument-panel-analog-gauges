@@ -6,6 +6,14 @@ The instrument panel is running on a single 24" monitor with plywood placed in f
 
 You can also run the display on a PC (the same one running FS2020 if you wish) but you won't have the knob inputs then although you can still use the knobs in the FS2020 cockpit and the changes will immediately be reflected on the instrument panel display.
 
+## Recent Updates
+
+- **Enhanced Network Communication**: Improved data link reliability with segregated ports (52020 for receiving, 52021 for sending)
+- **Container Support**: Added containerized build system with multi-architecture support (x86_64, arm64, armhf)
+- **Environment Variable Configuration**: Support for `DATA_LINK_HOST` environment variable for flexible network configuration
+- **Linux Desktop Improvements**: Better multi-monitor support and UI display on Linux desktop environments
+- **Enhanced Debugging**: Added comprehensive logging for network troubleshooting
+
 # Quick Start
 
 Download the following two zip files.
@@ -19,6 +27,25 @@ Unzip instrument-data-link into its own folder and double-click instrument-data-
 Unzip instrument-panel into its own folder. If you are running it on the same PC as FS2020 the default settings are correct so just double-click instrument-panel.exe to run it. Press M to switch the display to a different monitor so it's not on the same monitor as FS2020. If you then press Escape to exit the program the settings will be saved and it will run on the same monitor next time.
 
 To run instrument-panel on a different PC, unzip instrument-panel to a folder on the new PC. Edit settings/instrument-panel.json and in the "Data Link" section change the IP address of the "Host" to the address where FS2020 is running on your local network, e.g. 192.168.0.1 - You can find the correct address of your host by running a command prompt on the host machine and running ipconfig, then scroll back and look for the first "IPv4 Address" line. Now double-click instrument-panel.exe to run it.
+
+## Network Configuration
+
+The instrument panel now uses segregated ports for improved reliability:
+- **Port 52020**: Used for receiving data from the instrument-data-link
+- **Port 52021**: Used for sending requests to the instrument-data-link
+
+### Environment Variable Support
+
+You can now use the `DATA_LINK_HOST` environment variable to override the host configuration without modifying settings files. This is particularly useful for container deployments:
+
+```bash
+export DATA_LINK_HOST=192.168.1.100
+./instrument-panel
+```
+
+### Container Support
+
+The project now includes containerized build support for multiple architectures. See the `container-build.sh` and `build-with-podman.sh` scripts for building across different platforms (x86_64, arm64, armhf).
 
 Note: There is a screensaver feature so the instrument panel will appear dim until you run FS2020 and select where you are flying from. It will also dim when you are flying and enter the pause menu.
 
@@ -90,6 +117,16 @@ This program was heavily inspired by Dave Ault and contains original artwork by 
   
 It has been completely rewritten and updated to use Allegro5.
 
+## Building from Source
+
+### Containerized Build (Recommended)
+
+The project now supports containerized builds for multiple architectures using Podman. 
+
+For detailed build instructions and options, see the [Build Tools README](build-tools/README.md).
+
+### Traditional Build
+
 To install Allegro (5.2.7) on Windows:
 
   Load instrument-panel.sln into Visual Studio 2022 Community Edition.
@@ -101,6 +138,14 @@ To install Allegro on Raspberry Pi:
 ```
   sudo apt install liballegro5-dev
 ```
+
+### Dependencies
+
+The project requires the following dependencies:
+- g++ compiler
+- libgpiod-dev or wiringpi (for GPIO support)
+- liballegro5-dev and related packages (image, font)
+- libpthread-dev
 ### KEYS
 ```
 p ........ Adjust position and size of individual instruments.
@@ -136,6 +181,39 @@ Some of the instruments are 'intelligent' and will adapt to whatever aircraft yo
 Use a specific instrument in your panel if you don't want it to auto switch, for example, use "ASI Savage Cub" instead of "ASI" to always display the Savage Cub version of the instrument.
 
 Note that only a few specific instruments have been created so far as this project is a work in progress.  
+
+# Troubleshooting
+
+The instrument panel now includes enhanced debugging and logging features to help diagnose network communication issues.
+
+## Network Communication Issues
+
+If you're experiencing connection problems, the instrument panel will now output detailed logging information including:   
+(uncomment in code and rebuild)
+- Socket creation and binding status
+- Data transmission details
+- Connection state changes
+- Error codes and diagnostic information
+
+Check the console output for messages like:
+- `DataLink: Starting data link thread...`
+- `DataLink: Bound to port 52020 for receiving`
+- `DataLink: Will send data to [HOST]:[PORT]...`
+- `DataLink: Received X bytes`
+
+## Container Networking
+
+When running in containerized environments, ensure proper port mapping:
+- Container listens on port 52020 (receives data)
+- Container sends to host on port 52021
+- Use `DATA_LINK_HOST` environment variable to specify the host IP address
+
+Example container networking setup:
+```bash
+# Auto-detect host IP for container communication
+export DATA_LINK_HOST=$(ip route get 1.1.1.1 | awk '{print $7}' | head -1)
+./instrument-panel
+```
 
 # Known Issues
 

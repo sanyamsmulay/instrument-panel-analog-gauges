@@ -17,6 +17,8 @@ This directory contains the build system implementation for the Instrument Panel
 
 From the *project root directory*, run:
 
+### Quick Start
+
 ```bash
 # Make the build script executable
 chmod +x build-tools/build.sh
@@ -86,3 +88,25 @@ For direct execution:
 For container execution:
 - Podman
 - X11 server with container access allowed
+
+## Testing
+
+### UDP Packet Monitor
+
+A Python test script is included to help debug network communication issues:
+
+```bash
+# Monitor UDP packets on the default port (52021)
+python3 build-tools/tests/udp_packet_monitor.py
+
+# Monitor on a specific IP and port
+python3 build-tools/tests/udp_packet_monitor.py --ip 0.0.0.0 --port 52021
+```
+
+This script listens for UDP packets and displays:
+- Timestamp of received packets
+- Source address and port
+- Packet size
+- Packet contents (decoded as text or hex if binary)
+
+Use this tool to verify that the instrument panel is sending data requests and to troubleshoot network connectivity issues.
