@@ -95,8 +95,9 @@ struct globalVars
     char info[256] = { '\0' };
 
     char dataLinkHost[64] = "127.0.0.1";
-    int dataLinkPort = 52021;
-    int dataRateFps = 1;
+    int dataLinkListenPort = 52021;
+    int instrumentPanelListenPort = 52020;
+    int dataRateFps = 10;
     int startOnMonitor = 0;
     bool monitorFullscreen = true;
     int monitorWidth = 1200;

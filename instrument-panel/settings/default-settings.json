@@ -1,7 +1,7 @@
 {
   "Data Link": {
     "Host": "127.0.0.1",
-    "Port": 52020,
+    "Port": 52021,
     "Data Rate FPS": 20
   },
   "Monitor": {

@@ -7,9 +7,12 @@
 #endif
 #include "simvars.h"
 
+const char* InstrumentPanelGroup = "Instrument Panel";
+const char* InstrumentPanelHost = "Host";
+const char* InstrumentPanelListenPort = "Listen Port";
 const char *DataLinkGroup = "Data Link";
 const char *DataLinkHost = "Host";
-const char *DataLinkPort = "Port";
+const char *DataLinkListenPort = "Listen Port";
 const char* DataRateFps = "Data Rate FPS";
 const char *MonitorGroup = "Monitor";
 const char *MonitorStartOn = "StartOn";
@@ -45,6 +48,18 @@ simvars::simvars(const char *customSettings)
     }
 
     loadSettings();
+
+    // Resolve data link host with precedence: environment > settings > default
+    // override settings data link host with environment variable
+    const char* envHost = getenv("DATA_LINK_HOST");
+    if (envHost != NULL) {
+        strcpy(globals.dataLinkHost, envHost);
+    }
+    // If no environment variable and globals.dataLinkHost is empty, use default
+    // if still not set, use default
+    else if (strlen(globals.dataLinkHost) == 0) {
+        strcpy(globals.dataLinkHost, "127.0.0.1");
+    }
 
     // Start data link thread
     dataLinkThread = new std::thread(dataLink, this);
@@ -124,11 +139,22 @@ void simvars::loadSettings()
                     if (_stricmp(name, DataLinkHost) == 0) {
                         strcpy(globals.dataLinkHost, value);
                     }
-                    else if (_stricmp(name, DataLinkPort) == 0) {
-                        globals.dataLinkPort = settingValue(value);
+                    else if (_stricmp(name, DataLinkListenPort) == 0) {
+                        globals.dataLinkListenPort = settingValue(value);
                     }
                     else if (_stricmp(name, DataRateFps) == 0) {
                         globals.dataRateFps = settingValue(value);
+                    }
+                }
+                else if (_stricmp(group, InstrumentPanelGroup) == 0) {
+                    if (_stricmp(name, InstrumentPanelHost) == 0) {
+                        // Only override if DATA_LINK_HOST env var is not set
+                        if (getenv("DATA_LINK_HOST") == NULL) {
+                            strcpy(globals.dataLinkHost, value);
+                        }
+                    }
+                    else if (_stricmp(name, InstrumentPanelListenPort) == 0) {
+                        globals.instrumentPanelListenPort = atoi(value);
                     }
                 }
                 else if (_stricmp(group, MonitorGroup) == 0) {
@@ -204,9 +230,14 @@ void simvars::saveSettings()
     if (outfile)
     {
         fprintf(outfile, "{\n");
+        fprintf(outfile, "  \"%s\": {\n", InstrumentPanelGroup);
+        fprintf(outfile, "    \"%s\": \"%s\",\n", InstrumentPanelHost, globals.dataLinkHost);
+        fprintf(outfile, "    \"%s\": %d\n", InstrumentPanelListenPort, globals.instrumentPanelListenPort);
+        fprintf(outfile, "  },\n");
+
         fprintf(outfile, "  \"%s\": {\n", DataLinkGroup);
         fprintf(outfile, "    \"%s\": \"%s\",\n", DataLinkHost, globals.dataLinkHost);
-        fprintf(outfile, "    \"%s\": %d,\n", DataLinkPort, globals.dataLinkPort);
+        fprintf(outfile, "    \"%s\": %d,\n", DataLinkListenPort, globals.dataLinkListenPort);
         fprintf(outfile, "    \"%s\": %d\n", DataRateFps, globals.dataRateFps);
         fprintf(outfile, "  },\n");
 
@@ -700,13 +731,9 @@ void simvars::write(EVENT_ID eventId, double value)
 #endif
 
         writeAddr.sin_family = AF_INET;
-        writeAddr.sin_port = htons(globals.dataLinkPort);
+        writeAddr.sin_port = htons(globals.dataLinkListenPort);
         
-        // Use environment variable for host address if available (for container communication)
-        const char* hostAddr = getenv("DATA_LINK_HOST");
-        if (hostAddr == NULL) {
-            hostAddr = globals.dataLinkHost;
-        }
+        const char* hostAddr = globals.dataLinkHost;
         
         inet_pton(AF_INET, hostAddr, &writeAddr.sin_addr);
     }
@@ -720,8 +747,8 @@ void simvars::write(EVENT_ID eventId, double value)
 void resetConnection()
 {
     dataSize = sizeof(SimVars);
-    printf("DataLink: dataSize = %zu bytes\n", dataSize);
-    fflush(stdout);
+    // printf("DataLink: dataSize = %zu bytes\n", dataSize);
+    // fflush(stdout);
     request.requestedSize = dataSize;
 
     // Want full data on first connect
@@ -800,8 +827,14 @@ void dataLink(simvars* thisPtr)
     // Configure receive socket
     sockaddr_in recvAddr;
     recvAddr.sin_family = AF_INET;
-    recvAddr.sin_port = htons(52020);
-    recvAddr.sin_addr.s_addr = INADDR_ANY;
+    recvAddr.sin_port = htons(globals.instrumentPanelListenPort);
+    // Restrict to localhost if host is 127.0.0.1
+    if (strcmp(globals.dataLinkHost, "127.0.0.1") == 0) {
+        recvAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    }
+    else {
+        recvAddr.sin_addr.s_addr = INADDR_ANY;
+    }
 
     if (bind(recvSock, (SOCKADDR*)&recvAddr, sizeof(recvAddr)) == SOCKET_ERROR) {
 #ifdef _WIN32
@@ -811,7 +844,7 @@ void dataLink(simvars* thisPtr)
 #endif
         fatalError("DataLink: Failed to bind UDP socket");
     }
-    printf("DataLink: Bound to port 52020 for receiving\n");
+    printf("DataLink: Bound to port %d for receiving\n", globals.instrumentPanelListenPort);
 
     int opt = 1;
 #ifdef _WIN32
@@ -832,15 +865,11 @@ void dataLink(simvars* thisPtr)
 
     sockaddr_in sendAddr;
     sendAddr.sin_family = AF_INET;
-    sendAddr.sin_port = htons(globals.dataLinkPort);
+    sendAddr.sin_port = htons(globals.dataLinkListenPort);
     
-    // Use environment variable for host address if available (for container communication)
-    const char* hostAddr = getenv("DATA_LINK_HOST");
-    if (hostAddr == NULL) {
-        hostAddr = globals.dataLinkHost;
-    }
+    const char* hostAddr = globals.dataLinkHost;
     
-    printf("DataLink: Will send data to %s:%d...\n", hostAddr, globals.dataLinkPort);
+    printf("DataLink: Will send requests to %s:%d...\n", hostAddr, globals.dataLinkListenPort);
     
     if (inet_pton(AF_INET, hostAddr, &sendAddr.sin_addr) <= 0) {
         sprintf(errMsg, "DataLink: Invalid server address: %s\n", hostAddr);
@@ -861,12 +890,12 @@ void dataLink(simvars* thisPtr)
         //    request.wantFullData = 1;
         //}
         request.wantFullData = 1;
-        printf("DataLink: Request - RequestedSize: %d, WantFullData: %d\n", request.requestedSize, request.wantFullData);
-        printf("DataLink: Request - reqSelfSize: %d\n", sizeof(request));        
-        printf("DataLink: Request - RequestedSize: %d, WantFullData: %d\n", sizeof(request.requestedSize), sizeof(request.wantFullData));
+        // printf("DataLink: Request - RequestedSize: %d, WantFullData: %d\n", request.requestedSize, request.wantFullData);
+        // printf("DataLink: Request - reqSelfSize: %d\n", sizeof(request));        
+        // printf("DataLink: Request - RequestedSize: %d, WantFullData: %d\n", sizeof(request.requestedSize), sizeof(request.wantFullData));
 
-        fflush(stdout);
-        printf("DataLink: Sending request\n");
+        // fflush(stdout);
+        // printf("DataLink: Sending request\n");
         
         for (int i = 0; i < sizeof(request); i++) {
             printf("%02x ", ((unsigned char*)&request)[i]);
@@ -876,7 +905,7 @@ void dataLink(simvars* thisPtr)
         bytes = sendto(sendSock, (char*)&request, sizeof(request), 0, (SOCKADDR*)&sendAddr, sizeof(sendAddr));
 
         if (bytes > 0) {
-            printf("DataLink: Request sent\n");
+            // printf("DataLink: Request sent\n");
             fd_set fds;
             FD_ZERO(&fds);
             FD_SET(recvSock, &fds);
@@ -885,7 +914,7 @@ void dataLink(simvars* thisPtr)
             if (sel > 0) {
                 // Receive latest data (delta will never be larger than full data size)
                 bytes = recv(recvSock, deltaData, dataSize, 0);
-                printf("DataLink: Received %d bytes\n", bytes);
+                // printf("DataLink: Received %d bytes\n", bytes);
                 if (bytes == 4) {
                     // Data size mismatch
                     memcpy(&actualSize, &thisPtr->simVars, 4);
@@ -912,7 +941,7 @@ void dataLink(simvars* thisPtr)
             else {
                 // Link can blip so wait for multiple failures
                 selFail++;
-                printf("DataLink: Select failed %d times\n", selFail);
+                // printf("DataLink: Select failed %d times\n", selFail);
                 if (selFail > 100) {
                     printf("DataLink: Multiple select failures detected\n");
                     bytes = SOCKET_ERROR;

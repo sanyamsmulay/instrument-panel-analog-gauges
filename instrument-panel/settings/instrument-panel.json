@@ -1,8 +1,12 @@
 {
+  "Instrument Panel": {
+    "Host": "127.0.0.1",
+    "Listen Port": 52020
+  },
   "Data Link": {
     "Host": "127.0.0.1",
-    "Port": 52021,
-    "Data Rate FPS": 1
+    "Listen Port": 52021,
+    "Data Rate FPS": 10
   },
   "Monitor": {
     "StartOn": 1,

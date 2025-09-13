@@ -11,8 +11,8 @@ build_for_arch() {
     case $arch in
         "arm64")
             export CXX=aarch64-linux-gnu-g++
-            export CFLAGS="-march=armv8-a"
-            export CXXFLAGS="-march=armv8-a"
+            export CFLAGS="-march=armv8-a -DDESKTOP_LINUX"
+            export CXXFLAGS="-march=armv8-a -DDESKTOP_LINUX"
             export LIB_PATH="/usr/lib/aarch64-linux-gnu"
             ;;
         "armhf")
