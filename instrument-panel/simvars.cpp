@@ -897,10 +897,11 @@ void dataLink(simvars* thisPtr)
         // fflush(stdout);
         // printf("DataLink: Sending request\n");
         
-        for (int i = 0; i < sizeof(request); i++) {
-            printf("%02x ", ((unsigned char*)&request)[i]);
-        }
-        printf("\n");
+        // print request hex values
+        // for (int i = 0; i < sizeof(request); i++) {
+        //     printf("%02x ", ((unsigned char*)&request)[i]);
+        // }
+        // printf("\n");
 
         bytes = sendto(sendSock, (char*)&request, sizeof(request), 0, (SOCKADDR*)&sendAddr, sizeof(sendAddr));
 
